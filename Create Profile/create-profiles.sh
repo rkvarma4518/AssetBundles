@@ -57,7 +57,20 @@ list_clients() {
 secret_from_env() {
   local var_name="$1"
   [[ -n "$var_name" ]] || { echo ""; return; }
-  echo "${!var_name:-}"
+  if [[ ! "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "ERROR: '*_env' keys in $ENV_FILE must be environment variable NAMES (e.g. CLIENTC_DATABRICKS_CLIENT_ID), not the secret values themselves." >&2
+    exit 1
+  fi
+  printenv "$var_name" || true
+}
+
+# Use the value written directly in env.yml (e.g. client_id);
+# if absent, fall back to the env var named in <key>_env (e.g. client_id_env)
+resolve() {
+  local v
+  v="$(get "$1" "$2")"
+  if [[ -n "$v" ]]; then echo "$v"; return; fi
+  secret_from_env "$(get "$1" "$2_env")"
 }
 
 remove_section() {
@@ -90,9 +103,9 @@ for name in $clients; do
 
   case "$auth_type" in
     pat)
-      token="$(secret_from_env "$(get "$name" token_env)")"
+      token="$(resolve "$name" token)"
       if [[ -z "$token" ]]; then
-        echo "SKIP  [$name] env var '$(get "$name" token_env)' is not set"
+        echo "SKIP  [$name] no 'token' (or token_env) set in $ENV_FILE"
         continue
       fi
       remove_section "$name"
@@ -106,10 +119,10 @@ for name in $clients; do
       ;;
 
     service_principal)
-      cid="$(secret_from_env "$(get "$name" client_id_env)")"
-      csec="$(secret_from_env "$(get "$name" client_secret_env)")"
+      cid="$(resolve "$name" client_id)"
+      csec="$(resolve "$name" client_secret)"
       if [[ -z "$cid" || -z "$csec" ]]; then
-        echo "SKIP  [$name] client id/secret env vars are not set"
+        echo "SKIP  [$name] client_id / client_secret missing in $ENV_FILE"
         continue
       fi
       remove_section "$name"

@@ -1,0 +1,40 @@
+bundle:
+  name: multi-client-pipeline
+  uuid: d6a8b1a5-9e87-4ff1-9580-5e5fa5efb8d9
+
+include:
+  - resources/*.yml
+
+# Variable declarations. These variables are assigned in the dev/prod targets below.
+variables:
+  catalog:
+    description: The catalog to use
+  schema:
+    description: The schema to use
+
+targets:
+  ClientA:
+    mode: development
+    default: true
+    presets:
+      name_prefix: dev_${workspace.current_user.short_name}
+    workspace:
+      sync_mode: overwrite
+      profile: ClientA
+      host: https://dbc-3ef9e0b5-ea74.cloud.databricks.com/
+    variables:
+      catalog: predictpi
+      schema: dev
+
+  clientB:
+    mode: development
+    default: true
+    presets:
+      name_prefix: dev_${workspace.current_user.short_name}
+    workspace:
+      sync_mode: overwrite
+      profile: clientB
+      host: https://dbc-fb51a5b0-0d24.cloud.databricks.com/
+    variables:
+      catalog: predictpi
+      schema: dev
