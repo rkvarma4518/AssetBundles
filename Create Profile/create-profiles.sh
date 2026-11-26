@@ -5,7 +5,7 @@
 #   ./create-profiles.sh                    # all clients in env.yml
 #   ./create-profiles.sh env.yml clienta    # a single client
 #
-# Requirements: databricks CLI (v0.205+), yq (mikefarah, v4+)
+# Requirements: databricks CLI (v0.205+). No yq needed.
 
 set -euo pipefail
 
@@ -14,17 +14,46 @@ ONLY_CLIENT="${2:-}"
 CFG="${DATABRICKS_CONFIG_FILE:-$HOME/.databrickscfg}"
 
 # ---- checks ---------------------------------------------------------------
-command -v yq >/dev/null         || { echo "ERROR: yq not found (https://github.com/mikefarah/yq)"; exit 1; }
 command -v databricks >/dev/null || { echo "ERROR: databricks CLI not found"; exit 1; }
 [[ -f "$ENV_FILE" ]]             || { echo "ERROR: $ENV_FILE not found"; exit 1; }
 
 touch "$CFG"
 chmod 600 "$CFG"
 
-# ---- helpers --------------------------------------------------------------
-get() { yq -r ".clients.\"$1\".$2 // \"\"" "$ENV_FILE"; }
+# ---- simple env.yml parser (no yq) ----------------------------------------
+# Emits lines of: client|key|value
+parse_env() {
+  awk '
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    /^clients:/ { inclients = 1; next }
+    inclients && /^  [A-Za-z0-9_.-]+:[[:space:]]*(#.*)?$/ {
+      c = $1; sub(/:$/, "", c); next
+    }
+    inclients && /^    [A-Za-z0-9_]+:/ {
+      line = $0; sub(/^[[:space:]]+/, "", line)
+      key = line; sub(/:.*/, "", key)
+      val = line; sub(/^[^:]+:[[:space:]]*/, "", val)
+      sub(/[[:space:]]+#.*$/, "", val)
+      sub(/[[:space:]]+$/, "", val)
+      gsub(/^"|"$/, "", val)
+      gsub(/^\047|\047$/, "", val)
+      print c "|" key "|" val
+    }
+  ' "$ENV_FILE"
+}
 
-# Read the value of the env var whose NAME is stored in the yml key
+PARSED="$(parse_env)"
+
+get() {
+  awk -F'|' -v c="$1" -v k="$2" '$1==c && $2==k { print $3; exit }' <<< "$PARSED"
+}
+
+list_clients() {
+  cut -d'|' -f1 <<< "$PARSED" | awk '!seen[$0]++'
+}
+
+# ---- helpers --------------------------------------------------------------
+# Read the value of the env var whose NAME is stored in env.yml
 secret_from_env() {
   local var_name="$1"
   [[ -n "$var_name" ]] || { echo ""; return; }
@@ -47,7 +76,7 @@ remove_section() {
 if [[ -n "$ONLY_CLIENT" ]]; then
   clients="$ONLY_CLIENT"
 else
-  clients="$(yq -r '.clients | keys | .[]' "$ENV_FILE")"
+  clients="$(list_clients)"
 fi
 
 for name in $clients; do

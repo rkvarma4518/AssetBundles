@@ -10,7 +10,7 @@
 #   ./delete-profiles.sh --clear-oauth-cache  # also remove cached OAuth tokens
 #
 # A backup of the config file is always made before anything is changed.
-# Requirements: yq (only when reading names from env.yml)
+# Requirements: none besides bash/awk. No yq needed.
 
 set -euo pipefail
 
@@ -36,6 +36,17 @@ done
 
 [[ -f "$CFG" ]] || { echo "Nothing to do: $CFG does not exist."; exit 0; }
 
+# ---- read client names from env.yml (no yq) -------------------------------
+list_clients() {
+  awk '
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    /^clients:/ { inclients = 1; next }
+    inclients && /^  [A-Za-z0-9_.-]+:[[:space:]]*(#.*)?$/ {
+      c = $1; sub(/:$/, "", c); print c
+    }
+  ' "$ENV_FILE"
+}
+
 # ---- decide which profiles to delete --------------------------------------
 existing="$(grep -E '^\[.+\]' "$CFG" | tr -d '[]' || true)"
 
@@ -47,9 +58,8 @@ case "$MODE" in
     targets="$SINGLE"
     ;;
   env)
-    command -v yq >/dev/null || { echo "ERROR: yq not found"; exit 1; }
-    [[ -f "$ENV_FILE" ]]     || { echo "ERROR: $ENV_FILE not found"; exit 1; }
-    targets="$(yq -r '.clients | keys | .[]' "$ENV_FILE")"
+    [[ -f "$ENV_FILE" ]] || { echo "ERROR: $ENV_FILE not found"; exit 1; }
+    targets="$(list_clients)"
     ;;
 esac
 

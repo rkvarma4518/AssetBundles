@@ -1,6 +1,6 @@
 # Databricks CLI Profile Scripts
 
-Scripts to create and delete Databricks CLI profiles for multiple clients, driven by a single `env.yml` file. Useful when you deploy Databricks Asset Bundles to a different workspace per client.
+Scripts to create and delete Databricks CLI profiles for multiple clients, driven by a single `env.yml` file. The only tool needed besides Bash is the Databricks CLI itself (no `yq` or other dependencies). Useful when you deploy Databricks Asset Bundles to a different workspace per client.
 
 ## Files
 
@@ -15,9 +15,6 @@ Scripts to create and delete Databricks CLI profiles for multiple clients, drive
 - **Databricks CLI** v0.205 or newer (`databricks -v`)
   - macOS/Linux: `brew tap databricks/tap && brew install databricks`
   - Windows: `winget install Databricks.DatabricksCLI`
-- **yq** (mikefarah, v4+), used to read `env.yml`
-  - macOS/Linux: `brew install yq`
-  - Windows: `winget install MikeFarah.yq`
 - **Bash** (Linux, macOS, WSL, or Git Bash on Windows)
 - A **user or service principal** in each client workspace. You cannot create a profile without an identity in that workspace, so ask the client admin to add you or create a service principal.
 
@@ -175,7 +172,7 @@ The profile name in the target must match the profile created by `create-profile
 
 | Problem | Fix |
 |---------|-----|
-| `yq not found` | Install mikefarah yq v4+ (not the Python `yq`) |
+| `env.yml` values not picked up | Keep the layout shown above: `clients:` at the top, client names indented 2 spaces, keys indented 4 spaces, no tabs |
 | `SKIP [client] env var ... is not set` | Export the secret env var before running the script |
 | `WARN ... authentication check failed` | Check the host URL, token validity, and that the identity has workspace access |
 | Host mismatch error during `bundle deploy` | Make sure `host` in the bundle target matches the host in the profile |
